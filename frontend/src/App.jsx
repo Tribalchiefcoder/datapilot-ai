@@ -3,6 +3,79 @@ import "./App.css";
 
 const API_URL = "http://127.0.0.1:5000";
 
+
+// Recalculate statistics from the rows currently visible in the spreadsheet.
+// Full-dataset analysis will be added in a later development step.
+function calculatePreviewAnalysis(dataset) {
+  if (!dataset) return null;
+
+  const rows = Array.isArray(dataset.preview) ? dataset.preview : [];
+  const columns = Array.isArray(dataset.column_names) ? dataset.column_names : [];
+  const isMissing = (value) => value === null || value === undefined || value === "";
+
+  const toNumber = (value) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value.trim());
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const numericColumns = new Set(Object.keys(dataset.analysis?.numeric_summary || {}));
+
+  columns.forEach((column) => {
+    const values = rows.map((row) => row[column]).filter((value) => !isMissing(value));
+    if (values.length > 0 && values.every((value) => toNumber(value) !== null)) {
+      numericColumns.add(column);
+    }
+  });
+
+  const numericSummary = {};
+  numericColumns.forEach((column) => {
+    const values = rows
+      .map((row) => row[column])
+      .filter((value) => !isMissing(value))
+      .map(toNumber)
+      .filter((value) => value !== null);
+
+    if (values.length === 0) {
+      numericSummary[column] = {
+        mean: null, minimum: null, maximum: null, standard_deviation: null,
+      };
+      return;
+    }
+
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    // Sample standard deviation, matching Pandas' default ddof=1.
+    const variance = values.length > 1
+      ? values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1)
+      : null;
+
+    numericSummary[column] = {
+      mean: Number(mean.toFixed(4)),
+      minimum: Math.min(...values),
+      maximum: Math.max(...values),
+      standard_deviation: variance === null ? null : Number(Math.sqrt(variance).toFixed(4)),
+    };
+  });
+
+  const missingByColumn = {};
+  columns.forEach((column) => {
+    missingByColumn[column] = rows.filter((row) => isMissing(row[column])).length;
+  });
+
+  return {
+    numeric_columns: numericColumns.size,
+    text_columns: Math.max(0, columns.length - numericColumns.size),
+    total_missing_values: Object.values(missingByColumn).reduce((sum, count) => sum + count, 0),
+    numeric_summary: numericSummary,
+    missing_by_column: missingByColumn,
+  };
+}
+
+
+
 function App() {
   const [backendStatus, setBackendStatus] = useState("Not connected");
   const [isChecking, setIsChecking] = useState(false);
@@ -115,6 +188,95 @@ function App() {
     }
   }
 
+  // Update one cell in the displayed dataset preview.
+  function handleCellChange(rowIndex, columnName, newValue) {
+    setDataset((previousDataset) => {
+      if (!previousDataset) return previousDataset;
+
+      const updatedPreview = previousDataset.preview.map((row, index) =>
+        index === rowIndex ? { ...row, [columnName]: newValue } : row
+      );
+
+      return { ...previousDataset, preview: updatedPreview };
+    });
+  }
+
+  // Add an empty row to the editable preview.
+  function handleAddRow() {
+    setDataset((previousDataset) => {
+      if (!previousDataset) return previousDataset;
+
+      const newRow = {};
+      previousDataset.column_names.forEach((column) => {
+        newRow[column] = "";
+      });
+
+      return {
+        ...previousDataset,
+        preview: [...previousDataset.preview, newRow],
+        rows: previousDataset.rows + 1,
+      };
+    });
+  }
+
+  // Add a new column to the editable preview.
+  function handleAddColumn() {
+    if (!dataset) return;
+
+    const enteredName = window.prompt("Enter the new column name:");
+    if (!enteredName || !enteredName.trim()) return;
+
+    const columnName = enteredName.trim();
+    if (dataset.column_names.includes(columnName)) {
+      window.alert("A column with this name already exists.");
+      return;
+    }
+
+    setDataset((previousDataset) => {
+      if (!previousDataset) return previousDataset;
+
+      const updatedPreview = previousDataset.preview.map((row) => ({
+        ...row,
+        [columnName]: "",
+      }));
+
+      return {
+        ...previousDataset,
+        column_names: [...previousDataset.column_names, columnName],
+        columns: previousDataset.columns + 1,
+        preview: updatedPreview,
+      };
+    });
+  }
+
+  // Export the currently displayed preview as CSV.
+  function handleExportCSV() {
+    if (!dataset) return;
+
+    const escapeCSV = (value) => {
+      const text = value == null ? "" : String(value);
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    const headers = dataset.column_names.map(escapeCSV).join(",");
+    const rows = dataset.preview.map((row) =>
+      dataset.column_names.map((column) => escapeCSV(row[column])).join(",")
+    );
+    const csvContent = [headers, ...rows].join("\r\n");
+
+    const blob = new Blob(["\uFEFF", csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "datapilot-edited.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Update the selected file.
   function handleFileChange(event) {
     const file = event.target.files?.[0] || null;
@@ -125,6 +287,9 @@ function App() {
     console.log("File selected:", file);
   }
 
+  // Recalculate analysis whenever the editable dataset changes.
+  const currentAnalysis = dataset ? calculatePreviewAnalysis(dataset) : null;
+
   return (
     <div className="app">
       <header className="topbar">
@@ -133,7 +298,7 @@ function App() {
           <p>Intelligent Business Data Analysis</p>
         </div>
 
-        <span className="badge">Day 3 · Data Analysis</span>
+        <span className="badge">Day 4 · Interactive Spreadsheet</span>
       </header>
 
       <main className="workspace">
@@ -188,7 +353,19 @@ function App() {
 
           {dataset && (
             <section className="dataset-preview">
-              <h2>Dataset Preview</h2>
+              <div className="spreadsheet-toolbar">
+                 <div>
+                   <h2>Interactive Spreadsheet</h2>
+                   <p className="preview-note">
+                     Edit cells directly. Changes stay in this browser session until exported.
+                   </p>
+                 </div>
+                 <div className="spreadsheet-actions">
+                   <button type="button" onClick={handleAddRow}>+ Add Row</button>
+                   <button type="button" onClick={handleAddColumn}>+ Add Column</button>
+                   <button type="button" onClick={handleExportCSV}>Export CSV</button>
+                 </div>
+               </div>
 
               <div className="dataset-summary">
                 <div className="summary-card">
@@ -207,29 +384,30 @@ function App() {
                 </div>
               </div>
 
-              {dataset.analysis && (
+              {currentAnalysis && (
                 <section className="analysis-summary">
-                  <h3>Automatic Analysis</h3>
+                  <h3>Live Analysis (Editable Preview)</h3>
+                  <p className="preview-note">Statistics update as you edit cells. They currently use the rows displayed in this spreadsheet.</p>
 
                   <div className="dataset-summary">
                     <div className="summary-card">
                       <span>Numeric Columns</span>
-                      <strong>{dataset.analysis.numeric_columns}</strong>
+                      <strong>{currentAnalysis.numeric_columns}</strong>
                     </div>
 
                     <div className="summary-card">
                       <span>Text Columns</span>
-                      <strong>{dataset.analysis.text_columns}</strong>
+                      <strong>{currentAnalysis.text_columns}</strong>
                     </div>
 
                     <div className="summary-card">
                       <span>Missing Values</span>
-                      <strong>{dataset.analysis.total_missing_values}</strong>
+                      <strong>{currentAnalysis.total_missing_values}</strong>
                     </div>
                   </div>
 
-                  {dataset.analysis.numeric_summary &&
-                    Object.keys(dataset.analysis.numeric_summary).length > 0 && (
+                  {currentAnalysis.numeric_summary &&
+                    Object.keys(currentAnalysis.numeric_summary).length > 0 && (
                       <>
                         <h3>Numeric Statistics</h3>
 
@@ -247,7 +425,7 @@ function App() {
 
                             <tbody>
                               {Object.entries(
-                                dataset.analysis.numeric_summary
+                                currentAnalysis.numeric_summary
                               ).map(([column, stats]) => (
                                 <tr key={column}>
                                   <td>{column}</td>
@@ -263,7 +441,7 @@ function App() {
                       </>
                     )}
 
-                  {dataset.analysis.missing_by_column && (
+                  {currentAnalysis.missing_by_column && (
                     <>
                       <h3>Missing Values by Column</h3>
 
@@ -278,7 +456,7 @@ function App() {
 
                           <tbody>
                             {Object.entries(
-                              dataset.analysis.missing_by_column
+                              currentAnalysis.missing_by_column
                             ).map(([column, count]) => (
                               <tr key={column}>
                                 <td>{column}</td>
@@ -311,10 +489,16 @@ function App() {
                         <tr key={rowIndex}>
                           {dataset.column_names.map((column, colIndex) => (
                             <td key={colIndex}>
-                              {row[column] == null
-                                ? "—"
-                                : String(row[column])}
-                            </td>
+                               <input
+                                 className="spreadsheet-cell"
+                                 type="text"
+                                 aria-label={`Row ${rowIndex + 1}, ${column}`}
+                                 value={row[column] == null ? "" : String(row[column])}
+                                 onChange={(event) =>
+                                   handleCellChange(rowIndex, column, event.target.value)
+                                 }
+                               />
+                             </td>
                           ))}
                         </tr>
                       ))}

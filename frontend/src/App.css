@@ -293,3 +293,60 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* Day 4: Editable spreadsheet cells */
+.spreadsheet-cell {
+  width: 100%;
+  min-width: 90px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.spreadsheet-cell:hover {
+  border-color: #cbd5e1;
+}
+
+.spreadsheet-cell:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.data-table td {
+  padding: 0;
+}
+
+/* Spreadsheet toolbar */
+.spreadsheet-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.spreadsheet-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.spreadsheet-actions button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.spreadsheet-actions button:hover {
+  opacity: 0.9;
+}
