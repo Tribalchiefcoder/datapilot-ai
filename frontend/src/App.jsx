@@ -84,6 +84,7 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   const [dataset, setDataset] = useState(null);
+  const [originalDataset, setOriginalDataset] = useState(null);
 
   // Check whether the Flask backend is running.
   async function checkBackend() {
@@ -175,6 +176,7 @@ function App() {
       }
 
       setDataset(result);
+      setOriginalDataset(result);
 
       setUploadMessage(
         `Success! ${result.filename} uploaded. ` +
@@ -249,6 +251,116 @@ function App() {
     });
   }
 
+  // Remove repeated rows from the currently displayed preview.
+  function handleRemoveDuplicates() {
+    setDataset((previousDataset) => {
+      if (!previousDataset) return previousDataset;
+
+      const seenRows = new Set();
+      const uniqueRows = previousDataset.preview.filter((row) => {
+        const rowKey = JSON.stringify(
+          previousDataset.column_names.map((column) => row[column] ?? "")
+        );
+        if (seenRows.has(rowKey)) return false;
+        seenRows.add(rowKey);
+        return true;
+      });
+
+      const removedCount = previousDataset.preview.length - uniqueRows.length;
+      if (removedCount === 0) {
+        setUploadMessage("No duplicate rows were found in the displayed preview.");
+        return previousDataset;
+      }
+
+      setUploadMessage(`Removed ${removedCount} duplicate row(s) from the displayed preview.`);
+      return {
+        ...previousDataset,
+        preview: uniqueRows,
+        rows: Math.max(0, previousDataset.rows - removedCount),
+      };
+    });
+  }
+
+  // Remove rows where every displayed cell is empty or whitespace.
+  function handleRemoveEmptyRows() {
+    setDataset((previousDataset) => {
+      if (!previousDataset) return previousDataset;
+
+      const nonEmptyRows = previousDataset.preview.filter((row) =>
+        previousDataset.column_names.some((column) => {
+          const value = row[column];
+          return value !== null && value !== undefined && String(value).trim() !== "";
+        })
+      );
+
+      const removedCount = previousDataset.preview.length - nonEmptyRows.length;
+      if (removedCount === 0) {
+        setUploadMessage("No completely empty rows were found in the displayed preview.");
+        return previousDataset;
+      }
+
+      setUploadMessage(`Removed ${removedCount} completely empty row(s) from the displayed preview.`);
+      return {
+        ...previousDataset,
+        preview: nonEmptyRows,
+        rows: Math.max(0, previousDataset.rows - removedCount),
+      };
+    });
+  }
+
+  // Fill empty cells in one selected column with a value supplied by the user.
+  function handleFillMissingValues() {
+    if (!dataset || dataset.column_names.length === 0) return;
+
+    const columnInput = window.prompt(
+      `Enter the column name to fill:\n${dataset.column_names.join(", ")}`
+    );
+    if (columnInput === null) return;
+
+    const columnName = columnInput.trim();
+    if (!dataset.column_names.includes(columnName)) {
+      window.alert("Please enter an exact column name from the dataset.");
+      return;
+    }
+
+    const fillValue = window.prompt(`Enter the value to use for empty cells in "${columnName}":`);
+    if (fillValue === null) return;
+
+    setDataset((previousDataset) => {
+      if (!previousDataset) return previousDataset;
+
+      let filledCount = 0;
+      const updatedPreview = previousDataset.preview.map((row) => {
+        const value = row[columnName];
+        const isEmpty = value === null || value === undefined || String(value).trim() === "";
+        if (!isEmpty) return row;
+
+        filledCount += 1;
+        return { ...row, [columnName]: fillValue };
+      });
+
+      setUploadMessage(
+        filledCount > 0
+          ? `Filled ${filledCount} missing value(s) in "${columnName}".`
+          : `No missing values were found in "${columnName}".`
+      );
+      return { ...previousDataset, preview: updatedPreview };
+    });
+  }
+
+  // Restore the dataset exactly as it was immediately after upload.
+  function handleResetChanges() {
+    if (!originalDataset) return;
+
+    const confirmed = window.confirm(
+      "Reset all edits and cleaning changes and restore the original uploaded preview?"
+    );
+    if (!confirmed) return;
+
+    setDataset(originalDataset);
+    setUploadMessage("Your dataset has been restored to its original uploaded preview.");
+  }
+
   // Export the currently displayed preview as CSV.
   function handleExportCSV() {
     if (!dataset) return;
@@ -298,7 +410,7 @@ function App() {
           <p>Intelligent Business Data Analysis</p>
         </div>
 
-        <span className="badge">Day 4 · Interactive Spreadsheet</span>
+        <span className="badge">Day 6 · Data Cleaning</span>
       </header>
 
       <main className="workspace">
@@ -357,12 +469,16 @@ function App() {
                  <div>
                    <h2>Interactive Spreadsheet</h2>
                    <p className="preview-note">
-                     Edit cells directly. Changes stay in this browser session until exported.
+                     Edit and clean the displayed rows. Changes stay in this browser session until exported.
                    </p>
                  </div>
                  <div className="spreadsheet-actions">
                    <button type="button" onClick={handleAddRow}>+ Add Row</button>
                    <button type="button" onClick={handleAddColumn}>+ Add Column</button>
+                   <button type="button" onClick={handleRemoveDuplicates}>Remove Duplicates</button>
+                   <button type="button" onClick={handleRemoveEmptyRows}>Remove Empty Rows</button>
+                   <button type="button" onClick={handleFillMissingValues}>Fill Missing Values</button>
+                   <button type="button" onClick={handleResetChanges}>Reset Changes</button>
                    <button type="button" onClick={handleExportCSV}>Export CSV</button>
                  </div>
                </div>

@@ -350,3 +350,29 @@ button:disabled {
 .spreadsheet-actions button:hover {
   opacity: 0.9;
 }
+
+
+/* Day 6: Data-cleaning toolbar controls */
+.spreadsheet-actions {
+  align-items: center;
+}
+
+.spreadsheet-actions button {
+  background: #3156c9;
+  color: #ffffff;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.spreadsheet-actions button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 600px) {
+  .spreadsheet-actions {
+    width: 100%;
+  }
+
+  .spreadsheet-actions button {
+    flex: 1 1 145px;
+  }
+}
