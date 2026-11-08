@@ -6,6 +6,19 @@
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/Tribalchiefcoder/datapilot-ai)
 
 DataPilot AI is a full-stack data analytics application designed to simplify data exploration, cleaning, visualization, and analysis. It combines Python-powered data processing with an interactive React dashboard and Google Gemini AI to help users understand their datasets more efficiently.
+## 📸 Project Screenshots
+
+### 1. Home Page
+![DataPilot AI Home Page](screenshots/Home.png)
+
+### 2. Data Workspace
+![DataPilot AI Workspace](screenshots/Workspace.png)
+
+### 3. Dataset Analysis
+![DataPilot AI Analysis](screenshots/Analysis.png)
+
+### 4. AI Business Analyst
+![DataPilot AI Chat](screenshots/Aichat.png)
 
 ## 🚀 Live Application
 
