@@ -3,19 +3,32 @@ frontend/node_modules/
 
 # React build files
 frontend/dist/
+frontend/.vite/
 
-# Python virtual environment
+# Python virtual environments
 backend/.venv/
+backend/venv/
+venv/
 
 # Python cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Environment variables and secrets
 .env
 .env.*
 !.env.example
 
+# Logs
+*.log
+
+# Runtime files
+instance/
+backend/instance/
+
 # Editor and operating system files
 .vscode/
+.idea/
 .DS_Store
+Thumbs.db
